@@ -7,14 +7,42 @@ This is a simplified version of the JobBot server for local demo purposes.
 It uses mock data instead of requiring MongoDB setup.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Dict, Any
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import List, Dict, Any, Optional
 import json
 from datetime import datetime, timedelta
 import uuid
+import jwt
+from passlib.context import CryptContext
+import os
+from pydantic import BaseModel
 
 app = FastAPI(title="JobBot Demo API", version="1.0.0-demo")
+
+# Authentication setup
+SECRET_KEY = "your-secret-key-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+# Pydantic models
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+    full_name: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: dict
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -24,6 +52,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# In-memory user storage for demo
+USERS_DB = {}
+USER_COUNTER = 1
+
+# Authentication functions
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        user = USERS_DB.get(user_id)
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
 # Mock data
 MOCK_USER = {
@@ -135,11 +197,32 @@ async def root():
     return {"message": "JobBot Demo API is running!", "version": "1.0.0-demo"}
 
 @app.get("/api/users/{user_id}")
-async def get_user_profile(user_id: str):
-    return MOCK_USER
+async def get_user_profile(user_id: str, current_user: dict = Depends(get_current_user)):
+    # Check if user owns this profile or allow access to own profile
+    if current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Return user data without password hash
+    return {k: v for k, v in current_user.items() if k != "password_hash"}
+
+@app.put("/api/users/{user_id}")
+async def update_user_profile(user_id: str, profile_data: dict, current_user: dict = Depends(get_current_user)):
+    # Check if user owns this profile
+    if current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Update user data (excluding password_hash and id)
+    for key, value in profile_data.items():
+        if key not in ["password_hash", "id"]:
+            current_user[key] = value
+    
+    current_user["updated_at"] = datetime.utcnow().isoformat()
+    
+    return {k: v for k, v in current_user.items() if k != "password_hash"}
 
 @app.get("/api/users")
 async def list_users():
+    # For demo purposes, return mock data
     return [MOCK_USER]
 
 @app.get("/api/users/{user_id}/campaigns")
@@ -224,6 +307,138 @@ async def get_linkedin_auth_url():
 @app.get("/api/linkedin/rate-limit")
 async def get_linkedin_rate_limit():
     return {"calls_made_today": 45, "daily_limit": 500}
+
+# Authentication endpoints
+@app.post("/api/auth/register", response_model=Token)
+async def register(user_data: UserRegister):
+    global USER_COUNTER
+    
+    # Check if user already exists
+    for existing_user in USERS_DB.values():
+        if existing_user["personal_info"]["email"] == user_data.email:
+            raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create new user
+    user_id = f"user_{USER_COUNTER}"
+    USER_COUNTER += 1
+    
+    new_user = {
+        "id": user_id,
+        "personal_info": {
+            "full_name": user_data.full_name,
+            "email": user_data.email,
+            "phone": "",
+            "linkedin_url": "",
+            "portfolio_url": "",
+            "location": ""
+        },
+        "experience": [],
+        "education": [],
+        "skills": [],
+        "certifications": [],
+        "preferences": {
+            "min_salary": "",
+            "max_salary": "",
+            "work_arrangement": "hybrid",
+            "willingness_to_relocate": False
+        },
+        "resume_file": None,
+        "password_hash": get_password_hash(user_data.password),
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    USERS_DB[user_id] = new_user
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user_id}, expires_delta=access_token_expires
+    )
+    
+    # Return user data without password hash
+    user_response = {k: v for k, v in new_user.items() if k != "password_hash"}
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user_response
+    }
+
+@app.post("/api/auth/login", response_model=Token)
+async def login(user_data: UserLogin):
+    # Find user by email
+    user = None
+    for u in USERS_DB.values():
+        if u["personal_info"]["email"] == user_data.email:
+            user = u
+            break
+    
+    if not user or not verify_password(user_data.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["id"]}, expires_delta=access_token_expires
+    )
+    
+    # Return user data without password hash
+    user_response = {k: v for k, v in user.items() if k != "password_hash"}
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user_response
+    }
+
+@app.get("/api/auth/verify")
+async def verify_token(current_user: dict = Depends(get_current_user)):
+    return {"valid": True, "user": {k: v for k, v in current_user.items() if k != "password_hash"}}
+
+# Resume upload endpoint
+@app.post("/api/users/{user_id}/resume")
+async def upload_resume(
+    user_id: str, 
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    # Check if user owns this profile
+    if current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Validate file type
+    if not file.filename.lower().endswith(('.pdf', '.doc', '.docx')):
+        raise HTTPException(status_code=400, detail="Only PDF, DOC, and DOCX files are allowed")
+    
+    # In a real app, you'd save to cloud storage
+    # For demo, we'll just store filename and basic info
+    resume_info = {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "size": file.size if hasattr(file, 'size') else None,
+        "uploaded_at": datetime.utcnow().isoformat()
+    }
+    
+    # Update user record
+    current_user["resume_file"] = resume_info
+    current_user["updated_at"] = datetime.utcnow().isoformat()
+    
+    return {"success": True, "resume": resume_info}
+
+@app.delete("/api/users/{user_id}/resume")
+async def delete_resume(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Check if user owns this profile
+    if current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    current_user["resume_file"] = None
+    current_user["updated_at"] = datetime.utcnow().isoformat()
+    
+    return {"success": True, "message": "Resume deleted"}
 
 if __name__ == "__main__":
     import uvicorn

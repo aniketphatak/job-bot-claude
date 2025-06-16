@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, 
   Save, 
@@ -12,12 +12,15 @@ import {
   Phone,
   Mail,
   Globe,
-  Linkedin
+  Linkedin,
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { useToast } from '../hooks/use-toast';
+import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -28,6 +31,7 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
   const [formData, setFormData] = useState({
     personal_info: {
       full_name: '',
@@ -50,9 +54,11 @@ const ProfilePage = () => {
   });
 
   const { toast } = useToast();
+  const { user } = useAuth();
+  const fileInputRef = useRef(null);
 
-  // Aniket's user ID from the test
-  const userId = '7db1f025-21f6-4737-a7a0-0c92c0581d71';
+  // Use authenticated user ID
+  const userId = user?.id;
 
   useEffect(() => {
     fetchProfile();
@@ -95,22 +101,12 @@ const ProfilePage = () => {
   const saveProfile = async () => {
     setSaving(true);
     try {
-      if (profile) {
-        // Update existing profile
-        await axios.put(`${API}/users/${userId}`, formData);
-        toast({
-          title: "Profile Updated",
-          description: "Your profile has been updated successfully.",
-        });
-      } else {
-        // Create new profile
-        const response = await axios.post(`${API}/users`, formData);
-        setProfile(response.data);
-        toast({
-          title: "Profile Created",
-          description: "Your profile has been created successfully.",
-        });
-      }
+      // Update existing profile
+      await axios.put(`${API}/users/${userId}`, formData);
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
       setEditing(false);
       fetchProfile();
     } catch (error) {
@@ -121,6 +117,80 @@ const ProfilePage = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResumeUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a PDF, DOC, or DOCX file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Please upload a file smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingResume(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      await axios.post(`${API}/users/${userId}/resume`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      toast({
+        title: "Resume Uploaded",
+        description: "Your resume has been uploaded successfully.",
+      });
+
+      fetchProfile();
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload resume. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingResume(false);
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const deleteResume = async () => {
+    try {
+      await axios.delete(`${API}/users/${userId}/resume`);
+      toast({
+        title: "Resume Deleted",
+        description: "Your resume has been deleted successfully.",
+      });
+      fetchProfile();
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete resume. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -476,6 +546,86 @@ const ProfilePage = () => {
               </div>
             )) || <p className="text-gray-500">No experience added yet.</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Resume Upload */}
+      <Card className="border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <FileText className="w-5 h-5" />
+            <span>Resume</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {profile?.resume_file ? (
+            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <FileText className="w-8 h-8 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800">{profile.resume_file.filename}</p>
+                  <p className="text-sm text-green-600">
+                    Uploaded {new Date(profile.resume_file.uploaded_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingResume}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Replace
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={deleteResume}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Upload Your Resume</h3>
+              <p className="text-gray-600 mb-4">
+                Upload your resume to help JobBot generate tailored applications and cover letters.
+              </p>
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingResume}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+              >
+                {uploadingResume ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-gray-500 mt-2">
+                Supports PDF, DOC, and DOCX files up to 5MB
+              </p>
+            </div>
+          )}
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx"
+            onChange={handleResumeUpload}
+            className="hidden"
+          />
         </CardContent>
       </Card>
 
