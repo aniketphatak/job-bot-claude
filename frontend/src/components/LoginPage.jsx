@@ -270,9 +270,26 @@ const LoginPage = () => {
 
         {/* Demo credentials hint */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800 font-medium mb-2">Demo Mode:</p>
-          <p className="text-xs text-blue-700">
-            Create a new account or use existing profile data from the demo server.
+          <p className="text-sm text-blue-800 font-medium mb-2">Quick Demo Login:</p>
+          <button
+            onClick={() => {
+              setFormData({
+                ...formData,
+                email: 'phatakaniket@gmail.com',
+                password: 'testtest'
+              });
+              // Auto-submit after setting credentials
+              setTimeout(() => {
+                const fakeEvent = { preventDefault: () => {} };
+                handleSubmit(fakeEvent);
+              }, 100);
+            }}
+            className="w-full p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm transition-colors"
+          >
+            🚀 Login as Aniket (Demo)
+          </button>
+          <p className="text-xs text-blue-700 mt-2">
+            Pre-configured account with sample data for testing
           </p>
         </div>
       </div>

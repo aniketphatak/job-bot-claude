@@ -18,6 +18,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { useToast } from '../hooks/use-toast';
+import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -38,8 +39,8 @@ const CampaignsPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Aniket's user ID from the test
-  const userId = '7db1f025-21f6-4737-a7a0-0c92c0581d71';
+  const { user } = useAuth();
+  const userId = user?.id;
 
   useEffect(() => {
     fetchCampaigns();
@@ -47,7 +48,12 @@ const CampaignsPage = () => {
 
   const fetchCampaigns = async () => {
     try {
-      const response = await axios.get(`${API}/users/${userId}/campaigns`);
+      const token = localStorage.getItem('authToken');
+      const response = await axios.get(`${API}/users/${userId}/campaigns`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setCampaigns(response.data);
       setLoading(false);
     } catch (error) {
@@ -111,7 +117,12 @@ const CampaignsPage = () => {
         salary_range: formData.salary_range
       };
 
-      await axios.post(`${API}/campaigns`, campaignData);
+      const token = localStorage.getItem('authToken');
+      await axios.post(`${API}/campaigns`, campaignData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       toast({
         title: "Campaign Created",
@@ -145,7 +156,12 @@ const CampaignsPage = () => {
       const campaign = campaigns.find(c => c.id === campaignId);
       const newStatus = campaign.status === 'active' ? 'paused' : 'active';
       
-      await axios.put(`${API}/campaigns/${campaignId}`, { status: newStatus });
+      const token = localStorage.getItem('authToken');
+      await axios.put(`${API}/campaigns/${campaignId}`, { status: newStatus }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       toast({
         title: `Campaign ${newStatus === 'active' ? 'Activated' : 'Paused'}`,
@@ -218,7 +234,7 @@ const CampaignsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Applications</p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {campaigns.reduce((sum, c) => sum + c.applications_submitted, 0)}
+                  {campaigns.reduce((sum, c) => sum + (c.applications_submitted || 0), 0)}
                 </p>
               </div>
               <TrendingUp className="w-8 h-8 text-blue-500" />
@@ -233,8 +249,8 @@ const CampaignsPage = () => {
                 <p className="text-sm font-medium text-gray-600">Response Rate</p>
                 <p className="text-3xl font-bold text-purple-600">
                   {campaigns.length > 0 ? (
-                    (campaigns.reduce((sum, c) => sum + c.responses, 0) / 
-                     campaigns.reduce((sum, c) => sum + c.applications_submitted, 0) * 100).toFixed(1)
+                    (campaigns.reduce((sum, c) => sum + (c.responses || 0), 0) / 
+                     Math.max(campaigns.reduce((sum, c) => sum + (c.applications_submitted || 0), 0), 1) * 100).toFixed(1)
                   ) : 0}%
                 </p>
               </div>
@@ -249,7 +265,7 @@ const CampaignsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Interviews</p>
                 <p className="text-3xl font-bold text-orange-600">
-                  {campaigns.reduce((sum, c) => sum + c.interviews, 0)}
+                  {campaigns.reduce((sum, c) => sum + (c.interviews || 0), 0)}
                 </p>
               </div>
               <Calendar className="w-8 h-8 text-orange-500" />
@@ -305,7 +321,7 @@ const CampaignsPage = () => {
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Keywords</h4>
                     <div className="flex flex-wrap gap-2">
-                      {campaign.keywords.map((keyword, index) => (
+                      {(campaign.keywords || []).map((keyword, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
                           {keyword}
                         </Badge>
@@ -316,14 +332,14 @@ const CampaignsPage = () => {
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Target Companies</h4>
                     <div className="flex flex-wrap gap-2">
-                      {campaign.companies.slice(0, 4).map((company, index) => (
+                      {(campaign.companies || campaign.target_companies || []).slice(0, 4).map((company, index) => (
                         <Badge key={index} variant="secondary" className="text-xs">
                           {company}
                         </Badge>
                       ))}
-                      {campaign.companies.length > 4 && (
+                      {(campaign.companies || campaign.target_companies || []).length > 4 && (
                         <Badge variant="secondary" className="text-xs">
-                          +{campaign.companies.length - 4} more
+                          +{(campaign.companies || campaign.target_companies || []).length - 4} more
                         </Badge>
                       )}
                     </div>
@@ -334,14 +350,19 @@ const CampaignsPage = () => {
                   <div className="flex items-center space-x-4 text-sm text-gray-600">
                     <div className="flex items-center space-x-1">
                       <MapPin className="w-4 h-4" />
-                      <span>{campaign.locations.join(', ')}</span>
+                      <span>{(campaign.locations || []).join(', ')}</span>
                     </div>
                   </div>
                   
                   <div className="flex items-center space-x-4 text-sm text-gray-600">
                     <div className="flex items-center space-x-1">
                       <DollarSign className="w-4 h-4" />
-                      <span>{campaign.salary_range}</span>
+                      <span>
+                        {typeof campaign.salary_range === 'object' && campaign.salary_range?.min ? 
+                          `$${(campaign.salary_range.min / 1000)}k - $${(campaign.salary_range.max / 1000)}k` : 
+                          (campaign.salary_range || 'Not specified')
+                        }
+                      </span>
                     </div>
                   </div>
 
@@ -355,15 +376,15 @@ const CampaignsPage = () => {
               {/* Performance Metrics */}
               <div className="grid grid-cols-3 gap-6 pt-4 border-t">
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-blue-600">{campaign.applications_submitted}</p>
+                  <p className="text-3xl font-bold text-blue-600">{campaign.applications_submitted || 0}</p>
                   <p className="text-sm text-gray-500">Applications</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-green-600">{campaign.responses}</p>
+                  <p className="text-3xl font-bold text-green-600">{campaign.responses || 0}</p>
                   <p className="text-sm text-gray-500">Responses</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-purple-600">{campaign.interviews}</p>
+                  <p className="text-3xl font-bold text-purple-600">{campaign.interviews || 0}</p>
                   <p className="text-sm text-gray-500">Interviews</p>
                 </div>
               </div>
@@ -373,13 +394,13 @@ const CampaignsPage = () => {
                 <div className="flex justify-between text-sm">
                   <span>Response Rate</span>
                   <span className="font-medium">
-                    {campaign.applications_submitted > 0 ? 
-                      ((campaign.responses / campaign.applications_submitted) * 100).toFixed(1) : 0}%
+                    {(campaign.applications_submitted || 0) > 0 ? 
+                      (((campaign.responses || 0) / (campaign.applications_submitted || 1)) * 100).toFixed(1) : 0}%
                   </span>
                 </div>
                 <Progress 
-                  value={campaign.applications_submitted > 0 ? 
-                    (campaign.responses / campaign.applications_submitted) * 100 : 0} 
+                  value={(campaign.applications_submitted || 0) > 0 ? 
+                    ((campaign.responses || 0) / (campaign.applications_submitted || 1)) * 100 : 0} 
                   className="h-2" 
                 />
               </div>

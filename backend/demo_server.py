@@ -24,7 +24,7 @@ app = FastAPI(title="JobBot Demo API", version="1.0.0-demo")
 # Authentication setup
 SECRET_KEY = "your-secret-key-change-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours for easier testing
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
@@ -57,12 +57,76 @@ app.add_middleware(
 USERS_DB = {}
 USER_COUNTER = 1
 
+# Pre-seed Aniket's account
+def seed_default_user():
+    global USER_COUNTER
+    
+    # Create Aniket's user account
+    user_id = "aniket_user_1"
+    aniket_user = {
+        "id": user_id,
+        "personal_info": {
+            "full_name": "Aniket Phatak",
+            "email": "phatakaniket@gmail.com",
+            "phone": "+1-408-555-0123",
+            "linkedin_url": "https://linkedin.com/in/aniketphatak",
+            "portfolio_url": "",
+            "location": "Milpitas, CA 95035"
+        },
+        "experience": [
+            {
+                "title": "Product Lead",
+                "company": "Amazon",
+                "start_date": "2020-01",
+                "end_date": "present",
+                "description": "Leading Voice AI and Automotive products for 300,000+ vehicles across 30+ brands"
+            },
+            {
+                "title": "Senior Product Manager",
+                "company": "Audible",
+                "start_date": "2018-03",
+                "end_date": "2020-01",
+                "description": "Scaled Audio on Auto to 315K MAUs with 60% YoY growth"
+            }
+        ],
+        "education": [
+            {
+                "degree": "MS Computer Science",
+                "school": "Stanford University",
+                "graduation_year": "2018"
+            }
+        ],
+        "skills": [
+            "Voice AI", "Product Strategy", "Automotive Technology", "Machine Learning",
+            "Product Management", "Data Analytics", "User Experience", "A/B Testing",
+            "Cross-Platform Development", "API Design", "Agile Methodologies"
+        ],
+        "certifications": [],
+        "preferences": {
+            "min_salary": 200000,
+            "max_salary": 350000,
+            "work_arrangement": "hybrid",
+            "willingness_to_relocate": False
+        },
+        "resumes": [],
+        "password_hash": get_password_hash("testtest"),
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    USERS_DB[user_id] = aniket_user
+    USER_COUNTER = 2
+    print(f"✅ Pre-seeded user: {aniket_user['personal_info']['email']}")
+
 # Authentication functions
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
     return pwd_context.hash(password)
+
+# Seed the default user on startup
+seed_default_user()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -142,11 +206,18 @@ MOCK_CAMPAIGNS = [
         "name": "Senior Product Leadership - AI/Tech",
         "target_roles": ["Senior Product Manager", "Principal PM", "Director Product", "VP Product"],
         "target_companies": ["Google", "Meta", "Apple", "Microsoft", "Tesla", "OpenAI"],
+        "companies": ["Google", "Meta", "Apple", "Microsoft", "Tesla", "OpenAI"],
         "keywords": ["AI", "Product", "Voice", "Automotive", "Machine Learning"],
-        "salary_range": {"min": 200000, "max": 350000},
+        "locations": ["San Francisco", "Seattle", "Remote"],
+        "experience_level": "Senior",
+        "salary_range": "$200k - $350k",
+        "applications_submitted": 23,
+        "responses": 4,
+        "interviews": 2,
         "status": "active",
         "created_at": (datetime.utcnow() - timedelta(days=7)).isoformat(),
-        "updated_at": datetime.utcnow().isoformat()
+        "updated_at": datetime.utcnow().isoformat(),
+        "last_activity": datetime.utcnow().isoformat()
     }
 ]
 
@@ -396,7 +467,7 @@ async def login(user_data: UserLogin):
 async def verify_token(current_user: dict = Depends(get_current_user)):
     return {"valid": True, "user": {k: v for k, v in current_user.items() if k != "password_hash"}}
 
-# Resume upload endpoint
+# Resume upload endpoint with versioning
 @app.post("/api/users/{user_id}/resume")
 async def upload_resume(
     user_id: str, 
@@ -411,23 +482,136 @@ async def upload_resume(
     if not file.filename.lower().endswith(('.pdf', '.doc', '.docx')):
         raise HTTPException(status_code=400, detail="Only PDF, DOC, and DOCX files are allowed")
     
-    # In a real app, you'd save to cloud storage
-    # For demo, we'll just store filename and basic info
+    # Read file content to get size
+    content = await file.read()
+    file_size = len(content)
+    
+    # Validate file size (5MB limit)
+    if file_size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
+    
+    # Parse resume content
+    parsed_data = await parse_resume_content(content, file.filename)
+    
+    # Create resume record (single resume per user)
     resume_info = {
+        "id": "user_resume",
         "filename": file.filename,
         "content_type": file.content_type,
-        "size": file.size if hasattr(file, 'size') else None,
-        "uploaded_at": datetime.utcnow().isoformat()
+        "size": file_size,
+        "uploaded_at": datetime.utcnow().isoformat(),
+        "is_active": True,
+        "parsed_data": parsed_data
     }
     
-    # Update user record
-    current_user["resume_file"] = resume_info
+    # Replace any existing resume with the new one
+    current_user["resumes"] = [resume_info]
     current_user["updated_at"] = datetime.utcnow().isoformat()
+    
+    # Update user profile with parsed data
+    if parsed_data:
+        await update_profile_from_resume(current_user, parsed_data)
     
     return {"success": True, "resume": resume_info}
 
-@app.delete("/api/users/{user_id}/resume")
-async def delete_resume(
+async def parse_resume_content(content: bytes, filename: str):
+    """Mock resume parsing - in production would use AI/ML service"""
+    # Simulate parsing different file types
+    file_ext = filename.lower().split('.')[-1]
+    
+    # Mock extracted data based on filename patterns
+    if "senior" in filename.lower() or "lead" in filename.lower():
+        return {
+            "personal_info": {
+                "full_name": "John Doe",
+                "email": "john.doe@email.com",
+                "phone": "+1-555-0123",
+                "location": "San Francisco, CA"
+            },
+            "experience": [
+                {
+                    "title": "Senior Product Manager",
+                    "company": "Tech Corp",
+                    "start_date": "2020-01",
+                    "end_date": "present",
+                    "description": "Led product strategy and development for AI-powered solutions"
+                }
+            ],
+            "skills": ["Product Management", "AI/ML", "Data Analysis", "Leadership", "Strategy"],
+            "education": [
+                {
+                    "degree": "MBA",
+                    "school": "Stanford University", 
+                    "graduation_year": "2019"
+                }
+            ]
+        }
+    else:
+        return {
+            "personal_info": {
+                "full_name": "Jane Smith",
+                "email": "jane.smith@email.com", 
+                "phone": "+1-555-0456",
+                "location": "New York, NY"
+            },
+            "experience": [
+                {
+                    "title": "Software Engineer",
+                    "company": "Startup Inc",
+                    "start_date": "2021-06", 
+                    "end_date": "present",
+                    "description": "Developed web applications using React and Node.js"
+                }
+            ],
+            "skills": ["JavaScript", "React", "Node.js", "Python", "AWS"],
+            "education": [
+                {
+                    "degree": "BS Computer Science",
+                    "school": "UC Berkeley",
+                    "graduation_year": "2021"  
+                }
+            ]
+        }
+
+async def update_profile_from_resume(user: dict, parsed_data: dict):
+    """Update user profile with parsed resume data"""
+    # Update personal info if not already filled
+    for key, value in parsed_data.get("personal_info", {}).items():
+        if not user.get("personal_info", {}).get(key):
+            if "personal_info" not in user:
+                user["personal_info"] = {}
+            user["personal_info"][key] = value
+    
+    # Merge experience 
+    if parsed_data.get("experience"):
+        if "experience" not in user:
+            user["experience"] = []
+        for exp in parsed_data["experience"]:
+            # Add if not already exists
+            if not any(e.get("title") == exp.get("title") and 
+                      e.get("company") == exp.get("company") for e in user["experience"]):
+                user["experience"].append(exp)
+    
+    # Merge skills
+    if parsed_data.get("skills"):
+        if "skills" not in user:
+            user["skills"] = []
+        for skill in parsed_data["skills"]:
+            if skill not in user["skills"]:
+                user["skills"].append(skill)
+    
+    # Merge education
+    if parsed_data.get("education"):
+        if "education" not in user:
+            user["education"] = []
+        for edu in parsed_data["education"]:
+            # Add if not already exists
+            if not any(e.get("degree") == edu.get("degree") and 
+                      e.get("school") == edu.get("school") for e in user["education"]):
+                user["education"].append(edu)
+
+@app.get("/api/users/{user_id}/resumes")
+async def get_resumes(
     user_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -435,10 +619,25 @@ async def delete_resume(
     if current_user["id"] != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    current_user["resume_file"] = None
+    resumes = current_user.get("resumes", [])
+    return {"resumes": resumes}
+
+@app.delete("/api/users/{user_id}/resume/{resume_id}")
+async def delete_resume(
+    user_id: str,
+    resume_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Check if user owns this profile
+    if current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Clear the user's resume
+    current_user["resumes"] = []
     current_user["updated_at"] = datetime.utcnow().isoformat()
     
     return {"success": True, "message": "Resume deleted"}
+
 
 if __name__ == "__main__":
     import uvicorn

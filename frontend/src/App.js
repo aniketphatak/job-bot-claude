@@ -6,6 +6,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./components/Dashboard";
 import JobsPage from "./components/JobsPage";
 import CampaignsPage from "./components/CampaignsPage";
+import ApplicationsPage from "./components/ApplicationsPage";
 import ProfilePage from "./components/ProfilePage";
 import SettingsPage from "./components/SettingsPage";
 import IntegrationsPage from "./components/IntegrationsPage";
@@ -28,7 +29,7 @@ function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/jobs" element={<JobsPage />} />
                     <Route path="/campaigns" element={<CampaignsPage />} />
-                    <Route path="/applications" element={<div className="p-8 text-center text-gray-500">Applications - Coming Soon</div>} />
+                    <Route path="/applications" element={<ApplicationsPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/integrations" element={<IntegrationsPage />} />
