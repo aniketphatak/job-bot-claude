@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 
 # Import models
-from models.user import UserProfile, UserProfileCreate, UserProfileUpdate
+from models.user import UserProfile, UserProfileCreate, UserProfileUpdate, AutomationSettingsUpdate, Resume
 from models.campaign import JobSearchCampaign, JobSearchCampaignCreate, JobSearchCampaignUpdate
 from models.job import Job, JobCreate, JobUpdate
 from models.application import Application, ApplicationCreate, ApplicationUpdate
@@ -24,6 +24,9 @@ from services.application_service import ApplicationService
 from services.analytics_service import AnalyticsService
 from services.ai_service import AIService
 from services.linkedin_service import LinkedInService
+from services.resume_service import ResumeService
+from services.auto_apply_service import AutoApplyService
+from services.scheduler_service import SchedulerService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -41,6 +44,9 @@ application_service = ApplicationService(db)
 analytics_service = AnalyticsService(db)
 ai_service = AIService(db)
 linkedin_service = LinkedInService(db)
+resume_service = ResumeService(db)
+auto_apply_service = AutoApplyService(db)
+scheduler_service = SchedulerService(db)
 
 # Create the main app without a prefix
 app = FastAPI(title="JobBot API", version="1.0.0")
@@ -479,6 +485,172 @@ async def get_linkedin_rate_limit():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Resume Management endpoints
+@api_router.post("/users/{user_id}/resumes")
+async def upload_resume(user_id: str, file: UploadFile = File(...), is_primary: bool = False):
+    """Upload a new resume for a user"""
+    try:
+        # Validate file type
+        allowed_types = ['application/pdf', 'application/msword',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Invalid file type. Only PDF, DOC, and DOCX are allowed")
+
+        # Validate file size (max 5MB)
+        content = await file.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+
+        # Parse resume (optional, for future AI integration)
+        parsed_data = await resume_service.parse_resume(content, file.filename)
+
+        # Upload resume
+        resume = await resume_service.upload_resume(
+            user_id=user_id,
+            file_name=file.filename,
+            file_content=content,
+            is_primary=is_primary,
+            parsed_data=parsed_data
+        )
+
+        return {
+            "message": "Resume uploaded successfully",
+            "resume": resume.model_dump()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/users/{user_id}/resumes", response_model=List[Resume])
+async def get_user_resumes(user_id: str):
+    """Get all resumes for a user"""
+    try:
+        resumes = await resume_service.get_resumes(user_id)
+        return resumes
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/users/{user_id}/resumes/{resume_id}", response_model=Resume)
+async def get_resume(user_id: str, resume_id: str):
+    """Get a specific resume by ID"""
+    try:
+        resume = await resume_service.get_resume(user_id, resume_id)
+        if not resume:
+            raise HTTPException(status_code=404, detail="Resume not found")
+        return resume
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/users/{user_id}/resumes/{resume_id}/set-primary")
+async def set_primary_resume(user_id: str, resume_id: str):
+    """Set a resume as the primary resume"""
+    try:
+        success = await resume_service.set_primary_resume(user_id, resume_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Resume not found")
+        return {"message": "Primary resume updated successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/users/{user_id}/resumes/{resume_id}")
+async def delete_resume(user_id: str, resume_id: str):
+    """Delete a resume"""
+    try:
+        success = await resume_service.delete_resume(user_id, resume_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Resume not found")
+        return {"message": "Resume deleted successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Automation Settings endpoints
+@api_router.get("/users/{user_id}/automation-settings")
+async def get_automation_settings(user_id: str):
+    """Get user's automation settings"""
+    try:
+        user_profile = await user_service.get_user_profile(user_id)
+        if not user_profile:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        return user_profile.automation_settings
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/users/{user_id}/automation-settings")
+async def update_automation_settings(user_id: str, settings: AutomationSettingsUpdate):
+    """Update user's automation settings"""
+    try:
+        # Get current profile
+        user_profile = await user_service.get_user_profile(user_id)
+        if not user_profile:
+            raise HTTPException(status_code=404, detail="User profile not found")
+
+        # Update automation settings
+        update_data = UserProfileUpdate(automation_settings=settings.model_dump(exclude_none=True))
+        updated_profile = await user_service.update_user_profile(user_id, update_data)
+
+        return {
+            "message": "Automation settings updated successfully",
+            "settings": updated_profile.automation_settings
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Auto-Apply endpoints
+@api_router.get("/users/{user_id}/auto-apply/stats")
+async def get_auto_apply_stats(user_id: str):
+    """Get auto-apply statistics for a user"""
+    try:
+        stats = await auto_apply_service.get_auto_apply_stats(user_id)
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/users/{user_id}/auto-apply/trigger")
+async def trigger_auto_apply(user_id: str):
+    """Manually trigger auto-apply job search for a user"""
+    try:
+        count = await scheduler_service.trigger_auto_apply_now(user_id)
+        return {
+            "message": f"Auto-apply triggered successfully",
+            "applications_submitted": count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/users/{user_id}/auto-apply/evaluate/{job_id}")
+async def evaluate_job_for_auto_apply(user_id: str, job_id: str, campaign_id: str):
+    """Evaluate if a job meets auto-apply criteria"""
+    try:
+        should_apply, reason, match_score = await auto_apply_service.evaluate_job_for_auto_apply(
+            user_id, job_id, campaign_id
+        )
+        return {
+            "should_apply": should_apply,
+            "reason": reason,
+            "match_score": match_score
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Scheduler endpoints
+@api_router.get("/scheduler/status")
+async def get_scheduler_status():
+    """Get scheduler status and job information"""
+    try:
+        status = scheduler_service.get_job_status()
+        return status
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 
@@ -497,6 +669,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def startup_scheduler():
+    """Start the background scheduler on app startup"""
+    logger.info("Starting background scheduler...")
+    scheduler_service.start()
+    logger.info("Background scheduler started successfully")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    """Shutdown database connection and scheduler on app shutdown"""
+    logger.info("Shutting down scheduler...")
+    scheduler_service.stop()
+    logger.info("Closing database connection...")
     client.close()

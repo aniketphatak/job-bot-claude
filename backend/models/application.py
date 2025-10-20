@@ -18,9 +18,12 @@ class Application(BaseModel):
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = "submitted"  # submitted, response_received, interview_scheduled, rejected, withdrawn
     custom_resume_base64: Optional[str] = None
+    resume_id: Optional[str] = None  # Reference to Resume object used
     cover_letter: Optional[str] = None
     linkedin_message: Optional[str] = None
     ai_confidence: float = 0.0  # 0-1
+    is_auto_applied: bool = False  # Was this applied automatically?
+    auto_apply_match_score: Optional[float] = None  # Match score when auto-applied
     response: Optional[ApplicationResponse] = None
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -31,9 +34,12 @@ class ApplicationCreate(BaseModel):
     campaign_id: str
     user_id: str
     custom_resume_base64: Optional[str] = None
+    resume_id: Optional[str] = None
     cover_letter: Optional[str] = None
     linkedin_message: Optional[str] = None
     ai_confidence: float = 0.0
+    is_auto_applied: bool = False
+    auto_apply_match_score: Optional[float] = None
 
 class ApplicationUpdate(BaseModel):
     status: Optional[str] = None

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings as SettingsIcon, 
-  Bot, 
+import {
+  Settings as SettingsIcon,
+  Bot,
   Key,
   LinkedinIcon,
   Save,
@@ -15,6 +15,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { useToast } from '../hooks/use-toast';
 import axios from 'axios';
+import AutomationSettings from './AutomationSettings';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 const API = `${BACKEND_URL}/api`;
@@ -383,6 +384,9 @@ const SettingsPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Automation Settings */}
+      <AutomationSettings userId={userId} />
 
       {/* Demo Mode Notice */}
       <Card className="border-0 shadow-lg bg-blue-50">
