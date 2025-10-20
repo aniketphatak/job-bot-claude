@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobBot Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .card-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #1a1a1a;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox {
+      width: 18px;
+      height: 18px;
+    }
+
+    .button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .button-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .button-primary:hover {
+      background: #5568d3;
+    }
+
+    .button-secondary {
+      background: white;
+      color: #667eea;
+      border: 1px solid #667eea;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .file-upload {
+      border: 2px dashed #d1d5db;
+      border-radius: 6px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .file-upload:hover {
+      border-color: #667eea;
+      background: #f9fafb;
+    }
+
+    .file-upload.has-file {
+      border-color: #10b981;
+      background: #d1fae5;
+    }
+
+    .success-message {
+      background: #d1fae5;
+      color: #065f46;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    .resume-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: #f9fafb;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .resume-item.default {
+      border-color: #667eea;
+      background: #eef2ff;
+    }
+
+    .resume-info {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .resume-icon {
+      font-size: 24px;
+    }
+
+    .resume-details {
+      flex: 1;
+    }
+
+    .resume-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 2px;
+    }
+
+    .resume-meta {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .resume-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .resume-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #667eea;
+      color: white;
+    }
+
+    .icon-button {
+      padding: 6px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 12px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .icon-button:hover {
+      background: #f3f4f6;
+      border-color: #667eea;
+    }
+
+    .icon-button.danger:hover {
+      background: #fee2e2;
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🤖 JobBot Settings</h1>
+      <p>Configure your profile and preferences</p>
+    </div>
+
+    <div class="success-message" id="success-message">
+      ✓ Settings saved successfully!
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Personal Information</h2>
+
+      <div class="form-group">
+        <label class="label">Full Name</label>
+        <input type="text" class="input" id="full_name" placeholder="Aniket Phatak">
+      </div>
+
+      <div class="form-group">
+        <label class="label">Email</label>
+        <input type="email" class="input" id="email" placeholder="phatakaniket@gmail.com">
+      </div>
+
+      <div class="form-group">
+        <label class="label">Phone</label>
+        <input type="tel" class="input" id="phone" placeholder="(201) 406-6717">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Resumes</h2>
+
+      <div class="form-group">
+        <div class="file-upload" id="resume-upload-area">
+          <p>📄 <strong>Click to upload a resume</strong></p>
+          <p class="help-text">PDF, DOC, or DOCX (max 5MB)</p>
+          <input type="file" id="resume-file" accept=".pdf,.doc,.docx" style="display: none;">
+        </div>
+        <p class="help-text" style="margin-top: 8px;">You can upload multiple resumes and choose which one to use for each job</p>
+      </div>
+
+      <div id="resume-list" style="margin-top: 16px;">
+        <!-- Resume list will be populated here -->
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Work Details</h2>
+
+      <div class="form-group">
+        <label class="label">Years of Experience</label>
+        <input type="number" class="input" id="years_of_experience" placeholder="10">
+      </div>
+
+      <div class="form-group">
+        <label class="label">Salary Expectation (Optional)</label>
+        <input type="text" class="input" id="salary_expectation" placeholder="$180,000 - $250,000">
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" class="checkbox" id="work_authorized">
+          <label class="label" for="work_authorized" style="margin: 0;">Authorized to work in US</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" class="checkbox" id="willing_to_relocate">
+          <label class="label" for="willing_to_relocate" style="margin: 0;">Willing to relocate</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Cover Letter Template (Optional)</h2>
+
+      <div class="form-group">
+        <textarea class="input textarea" id="cover_letter_template" placeholder="AI will customize this template for each job..."></textarea>
+        <p class="help-text">Leave blank to use AI-generated cover letters</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Application Preferences</h2>
+
+      <div class="form-group">
+        <label class="label">Daily Application Limit</label>
+        <input type="number" class="input" id="daily_limit" value="15" min="1" max="50">
+        <p class="help-text">Maximum applications per day (recommended: 5-15)</p>
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" class="checkbox" id="preview_mode" checked>
+          <label class="label" for="preview_mode" style="margin: 0;">
+            Preview Mode (Review before submitting)
+          </label>
+        </div>
+        <p class="help-text">Uncheck for true one-click apply (not recommended initially)</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Backend Integration (Optional)</h2>
+
+      <div class="form-group">
+        <label class="label">JobBot Backend URL</label>
+        <input type="url" class="input" id="backend_url" placeholder="http://localhost:8001">
+        <p class="help-text">Connect to your JobBot backend for advanced features</p>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px;">
+      <button class="button button-primary" id="save-button" style="flex: 1;">
+        Save Settings
+      </button>
+      <button class="button button-secondary" id="test-button">
+        Test Configuration
+      </button>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

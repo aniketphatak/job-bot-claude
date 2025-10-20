@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobBot</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 380px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f8f9fa;
+    }
+
+    .container {
+      padding: 16px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .status-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .status-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-ready {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge-not-ready {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-detecting {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .job-info {
+      margin-bottom: 16px;
+      padding: 12px;
+      background: #f3f4f6;
+      border-radius: 6px;
+    }
+
+    .job-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+
+    .job-company {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .match-score {
+      display: inline-block;
+      background: #667eea;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .info-grid {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      color: #4b5563;
+    }
+
+    .info-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+    }
+
+    .icon-check {
+      color: #10b981;
+    }
+
+    .icon-x {
+      color: #ef4444;
+    }
+
+    .button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+
+    .button-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .button-primary:hover {
+      background: #5568d3;
+    }
+
+    .button-primary:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .button-secondary {
+      background: white;
+      color: #667eea;
+      border: 1px solid #667eea;
+    }
+
+    .button-secondary:hover {
+      background: #f3f4f6;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      text-align: center;
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .settings-link {
+      text-align: center;
+      margin-top: 12px;
+    }
+
+    .settings-link a {
+      color: #667eea;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .settings-link a:hover {
+      text-decoration: underline;
+    }
+
+    .warning {
+      background: #fef3c7;
+      border-left: 3px solid #f59e0b;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+    }
+
+    .warning-text {
+      font-size: 12px;
+      color: #92400e;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 12px 8px;
+      background: #f3f4f6;
+      border-radius: 6px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🤖 JobBot Assistant</h1>
+    <p>Smart one-click job applications</p>
+  </div>
+
+  <div class="container">
+    <!-- Not on job page view -->
+    <div id="no-job-view">
+      <div class="status-card">
+        <div class="status-header">
+          <span class="status-title">Status</span>
+          <span class="status-badge badge-not-ready">Not on job page</span>
+        </div>
+        <p style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">
+          Visit a job posting on LinkedIn or Indeed to use JobBot's one-click apply feature.
+        </p>
+        <button class="button button-secondary" id="open-dashboard">
+          Open Dashboard
+        </button>
+      </div>
+
+      <div class="status-card">
+        <div class="status-title" style="margin-bottom: 12px;">Today's Activity</div>
+        <div class="stats">
+          <div class="stat-item">
+            <div class="stat-value" id="stat-today">0</div>
+            <div class="stat-label">Applied</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-limit">15</div>
+            <div class="stat-label">Daily Limit</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">Total</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Job detected view -->
+    <div id="job-view" class="hidden">
+      <div class="status-card">
+        <div class="status-header">
+          <span class="status-title">Job Detected</span>
+          <span class="status-badge badge-ready" id="status-badge">Ready to Apply</span>
+        </div>
+
+        <div class="job-info">
+          <div class="job-title" id="job-title">Loading...</div>
+          <div class="job-company" id="job-company">...</div>
+          <span class="match-score" id="match-score">Match: ---%</span>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-icon icon-check">✓</span>
+            <span id="resume-status">Resume ready</span>
+          </div>
+          <div class="info-item">
+            <span class="info-icon icon-check">✓</span>
+            <span id="cover-letter-status">Cover letter generated</span>
+          </div>
+          <div class="info-item">
+            <span class="info-icon icon-check">✓</span>
+            <span id="fields-status">Fields detected</span>
+          </div>
+        </div>
+
+        <div id="resume-selector-container" class="hidden" style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+            Select Resume for This Job
+          </label>
+          <select id="resume-selector" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white;">
+            <option value="">Use default resume</option>
+          </select>
+          <p style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+            Choose a specific resume or use your default
+          </p>
+        </div>
+
+        <div class="warning">
+          <div class="warning-text">
+            ⚠️ <strong>Preview Mode:</strong> Review before submitting. Disable in settings for one-click.
+          </div>
+        </div>
+
+        <div id="progress-container" class="hidden">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+          </div>
+          <div class="progress-text" id="progress-text">Preparing...</div>
+        </div>
+
+        <button class="button button-primary" id="apply-button">
+          🚀 Apply to This Job
+        </button>
+        <button class="button button-secondary" id="preview-button">
+          👁️ Preview Application
+        </button>
+      </div>
+
+      <div class="status-card">
+        <div class="stats">
+          <div class="stat-item">
+            <div class="stat-value" id="job-stat-today">0</div>
+            <div class="stat-label">Today</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="job-stat-limit">15</div>
+            <div class="stat-label">Limit</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="job-stat-remaining">15</div>
+            <div class="stat-label">Remaining</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-link">
+      <a href="#" id="settings-link">⚙️ Settings & Profile</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
