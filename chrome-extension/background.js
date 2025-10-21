@@ -38,10 +38,10 @@ chrome.runtime.onInstalled.addListener(async () => {
 
   if (Object.keys(toSet).length > 0) {
     await chrome.storage.local.set(toSet);
-  }
 
-  // Open welcome page
-  chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
+    // Open settings page on first install to configure profile
+    chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
+  }
 });
 
 // Reset daily counter at midnight
