@@ -32,7 +32,7 @@
         "*://www.linkedin.com/jobs/*",
         "*://www.linkedin.com/jobs/view/*"
       ],
-      "js": ["content-scripts/linkedin.js"],
+      "js": ["content-scripts/common.js", "content-scripts/linkedin.js"],
       "css": ["styles/content.css"],
       "run_at": "document_idle"
     },
@@ -41,7 +41,7 @@
         "*://www.indeed.com/viewjob*",
         "*://www.indeed.com/m/jobs*"
       ],
-      "js": ["content-scripts/indeed.js"],
+      "js": ["content-scripts/common.js", "content-scripts/indeed.js"],
       "css": ["styles/content.css"],
       "run_at": "document_idle"
     }

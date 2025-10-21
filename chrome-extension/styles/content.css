@@ -1,0 +1,53 @@
+/* JobBot Content Script Styles */
+
+/* JobBot indicator that appears on job pages */
+#jobbot-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: opacity 0.5s;
+}
+
+/* Highlighted fields that JobBot will auto-fill */
+.jobbot-highlight {
+  outline: 2px solid #667eea !important;
+  outline-offset: 2px;
+  transition: outline 0.3s;
+}
+
+/* Processing overlay */
+.jobbot-processing {
+  position: relative;
+}
+
+.jobbot-processing::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(102, 126, 234, 0.1);
+  border: 2px solid #667eea;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Success indicator */
+.jobbot-success {
+  animation: jobbot-pulse 0.5s ease-in-out;
+}
+
+@keyframes jobbot-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
